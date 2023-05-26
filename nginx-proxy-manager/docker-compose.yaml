@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - npm-network
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+    environment:
+      DB_MYSQL_HOST: mariadb
+      DB_MYSQL_PORT: '3306'
+      DB_MYSQL_USER: npmanager
+      DB_MYSQL_PASSWORD: npmanager
+      DB_MYSQL_NAME: npmanager
+    volumes:
+      - npm_data:/data
+      - npm_acme:/etc/letsencrypt/acme
+      - npm_letsencrypt:/etc/letsencrypt
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    networks:
+      - npm-network
+    environment:
+      MYSQL_ROOT_PASSWORD: manitoba
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - init:/docker-entrypoint-initdb.d
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - '8080:80'
+    networks:
+      - npm-network
+    environment:
+      WORDPRESS_DB_HOST: mariadb:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wordpress_themes:/var/www/html/wp-content/themes
+      - wordpress_plugins:/var/www/html/wp-content/plugins
+      - wordpress_data:/var/www/html
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 25s
+      timeout: 10s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: '3306'
+      PMA_ARBITRARY: 1
+      MYSQL_ROOT_PASSWORD: manitoba
+    ports:
+      - '8181:80'
+    networks:
+      - npm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 25s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  npm_data:
+  npm_acme:
+  npm_letsencrypt:
+  mariadb_data:
+  init:
+  wordpress_themes:
+  wordpress_plugins:
+  wordpress_data:
+
+networks:
+  npm-network:
