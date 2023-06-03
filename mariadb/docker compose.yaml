@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: manitoba
+    volumes: 
+      - "./data:/var/lib/mysql/data"
+      - "./logs:/var/lib/mysql/logs"
+      - "./init:/docker-entrypoint-initdb.d"
+    healthcheck:
+      test: ["CMD", "mysql", "-e", "SHOW TABLES"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: '3306'
+      PMA_ARBITRARY: 1
+      MYSQL_ROOT_PASSWORD: manitoba
+    ports:
+      - '8181:80'
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "80"]
+      interval: 25s
+      timeout: 10s
+      retries: 5
